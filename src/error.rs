@@ -1,100 +1,144 @@
-use std::fmt;
+use thiserror::Error;
 
-#[derive(Debug)]
-pub enum Error {
-    ContentDecode,
-    DictKey,
-    Header,
-    IO(std::io::Error),
-    ObjectIdMismatch,
-    ObjectNotFound,
-    Offset(usize),
-    PageNumberNotFound(u32),
-    Parse {
-        offset: usize,
-    },
-    ReferenceLimit,
-    BracketLimit,
-    Trailer,
-    Type,
-    UTF8,
-    Syntax(String),
-    Xref(XrefError),
-    #[cfg(feature = "embed_image")]
-    Image(image::ImageError),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::ContentDecode => write!(f, "Could not decode content"),
-            Error::DictKey => write!(f, "A required dictionary key was not found"),
-            Error::Header => write!(f, "Invalid file header"),
-            Error::IO(e) => e.fmt(f),
-            Error::ObjectIdMismatch => write!(f, "The object id found did not match the requested object"),
-            Error::ObjectNotFound => write!(f, "A required object was not found"),
-            Error::Offset(o) => write!(f, "Invalid file offset: {}", o),
-            Error::PageNumberNotFound(p) => write!(f, "Page number {} could not be found", p),
-            Error::Parse { offset, .. } => write!(f, "Invalid object at byte {}", offset),
-            Error::ReferenceLimit => write!(f, "Could not dereference an object; possible reference loop"),
-            Error::BracketLimit => write!(f, "Too deep embedding of ()'s."),
-            Error::Trailer => write!(f, "Invalid file trailer"),
-            Error::Type => write!(f, "An object does not have the expected type"),
-            Error::UTF8 => write!(f, "UTF-8 error"),
-            Error::Syntax(msg) => write!(f, "Syntax error: {}", msg),
-            Error::Xref(e) => write!(f, "Invalid cross-reference table ({})", e),
-            #[cfg(feature = "embed_image")]
-            Error::Image(e) => e.fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-#[derive(Debug)]
-pub enum XrefError {
-    Parse,
-    Start,
-    PrevStart,
-    StreamStart,
-}
-
-impl fmt::Display for XrefError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            XrefError::Parse => write!(f, "could not parse xref"),
-            XrefError::Start => write!(f, "invalid start value"),
-            XrefError::PrevStart => write!(f, "invalid start value in Prev field"),
-            XrefError::StreamStart => write!(f, "invalid stream start value"),
-        }
-    }
-}
-
-impl std::error::Error for XrefError {}
+use crate::encodings::cmap::UnicodeCMapError;
+use crate::{encryption, ObjectId};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Error::IO(err)
-    }
+#[derive(Debug, Error)]
+pub enum Error {
+    /// Lopdf does not (yet) implement a needed feature.
+    #[error("missing feature of lopdf: {0}; please open an issue at https://github.com/J-F-Liu/lopdf/ to let the developers know of your usecase")]
+    Unimplemented(&'static str),
+
+    /// An Object has the wrong type, e.g. the Object is an Array where a Name would be expected.
+    #[error("object has wrong type; expected type {expected} but found type {found}")]
+    ObjectType {
+        expected: &'static str,
+        found: &'static str,
+    },
+    #[error("dictionary has wrong type: ")]
+    DictType { expected: &'static str, found: String },
+    /// PDF document is already encrypted.
+    #[error("PDF document is already encrypted")]
+    AlreadyEncrypted,
+    /// The encountered character encoding is invalid.
+    #[error("invalid character encoding")]
+    CharacterEncoding,
+    /// The stream couldn't be decompressed.
+    #[error("couldn't decompress stream {0}")]
+    Decompress(#[from] DecompressError),
+    /// Failed to parse input.
+    #[error("couldn't parse input: {0}")]
+    Parse(#[from] ParseError),
+    /// Error when decrypting the contents of the file
+    #[error("decryption error: {0}")]
+    Decryption(#[from] encryption::DecryptionError),
+    /// Dictionary key was not found.
+    #[error("missing required dictionary key \"{0}\"")]
+    DictKey(String),
+    /// Invalid inline image.
+    #[error("invalid inline image: {0}")]
+    InvalidInlineImage(String),
+    /// Invalid document outline.
+    #[error("invalid document outline: {0}")]
+    InvalidOutline(String),
+    /// Invalid stream.
+    #[error("invalid stream: {0}")]
+    InvalidStream(String),
+    /// Invalid object stream.
+    #[error("invalid object stream: {0}")]
+    InvalidObjectStream(String),
+    /// Byte offset in stream or file is invalid.
+    #[error("invalid byte offset")]
+    InvalidOffset(usize),
+    /// IO error
+    #[error("IO error: {0}")]
+    IO(#[from] std::io::Error),
+    // TODO: Maybe remove, as outline is not required in spec.
+    /// PDF document has no outline.
+    #[error("PDF document does not have an outline")]
+    NoOutline,
+    /// PDF document is not encrypted.
+    #[error("PDF document is not encrypted")]
+    NotEncrypted,
+    /// Missing xref entry.
+    #[error("missing xref entry")]
+    MissingXrefEntry,
+    /// The Object ID was not found.
+    #[error("object ID {} {} not found", .0.0, .0.1)]
+    ObjectNotFound(ObjectId),
+    /// Dereferencing object failed due to a reference cycle.
+    #[error("reference cycle with object ID {} {}", .0.0, .0.1)]
+    ReferenceCycle(ObjectId),
+    /// Page number was not found in document.
+    #[error("page number not found")]
+    PageNumberNotFound(u32),
+    /// Numeric type cast failed.
+    #[error("numberic type cast failed: {0}")]
+    NumericCast(String),
+    /// Dereferencing object reached the limit.
+    /// This might indicate a reference loop.
+    #[error("dereferencing object reached limit, may indicate a reference cycle")]
+    ReferenceLimit,
+    /// Decoding text string failed.
+    #[error("decoding text string failed")]
+    TextStringDecode,
+    /// Error while parsing cross reference table.
+    #[error("failed parsing cross reference table: {0}")]
+    Xref(XrefError),
+    /// Invalid indirect object while parsing at offset.
+    #[error("invalid indirect object at byte offset {offset}")]
+    IndirectObject { offset: usize },
+    /// Found object ID does not match expected object ID.
+    #[error("found object ID does not match expected object ID")]
+    ObjectIdMismatch,
+    /// Error when handling images.
+    #[cfg(feature = "embed_image")]
+    #[error("image error: {0}")]
+    Image(#[from] image::ImageError),
+    /// Syntax error while processing the content stream.
+    #[error("syntax error in content stream: {0}")]
+    Syntax(String),
+    /// Could not parse ToUnicodeCMap.
+    #[error("failed parsing ToUnicode CMap: {0}")]
+    ToUnicodeCMap(#[from] UnicodeCMapError),
+    #[error("converting integer: {0}")]
+    TryFromInt(#[from] std::num::TryFromIntError),
+    /// Encountered an unsupported security handler.
+    #[error("unsupported security handler")]
+    UnsupportedSecurityHandler(Vec<u8>),
 }
 
-impl From<std::string::FromUtf8Error> for Error {
-    fn from(_err: std::string::FromUtf8Error) -> Self {
-        Error::UTF8
-    }
+#[derive(Error, Debug)]
+pub enum DecompressError {
+    #[error("decoding ASCII85 failed: {0}")]
+    Ascii85(&'static str),
 }
 
-impl From<std::str::Utf8Error> for Error {
-    fn from(_err: std::str::Utf8Error) -> Self {
-        Error::UTF8
-    }
+#[derive(Error, Debug)]
+pub enum ParseError {
+    #[error("unexpected end of input")]
+    EndOfInput,
+    #[error("invalid content stream")]
+    InvalidContentStream,
+    #[error("invalid file header")]
+    InvalidFileHeader,
+    #[error("invalid file trailer")]
+    InvalidTrailer,
+    #[error("invalid cross reference table")]
+    InvalidXref,
 }
 
-#[cfg(feature = "embed_image")]
-impl From<image::ImageError> for Error {
-    fn from(err: image::ImageError) -> Self {
-        Error::Image(err)
-    }
+#[derive(Debug, Error)]
+pub enum XrefError {
+    /// Could not find start of cross reference table.
+    #[error("invalid start value")]
+    Start,
+    /// The trailer's "Prev" field was invalid.
+    #[error("invalid start value in Prev field")]
+    PrevStart,
+    /// The trailer's "XRefStm" field was invalid.
+    #[error("invalid start value of XRefStm")]
+    StreamStart,
 }

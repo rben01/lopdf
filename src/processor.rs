@@ -8,9 +8,9 @@ impl Document {
     /// Change producer of document information dictionary.
     pub fn change_producer(&mut self, producer: &str) {
         if let Ok(info) = self.trailer.get_mut(b"Info") {
-            if let Some(dict) = match *info {
-                Object::Dictionary(ref mut dict) => Some(dict),
-                Object::Reference(ref id) => self.objects.get_mut(id).and_then(|o| o.as_dict_mut().ok()),
+            if let Some(dict) = match info {
+                Object::Dictionary(dict) => Some(dict),
+                Object::Reference(id) => self.objects.get_mut(id).and_then(|o| o.as_dict_mut().ok()),
                 _ => None,
             } {
                 dict.set("Producer", Object::string_literal(producer));
@@ -21,7 +21,7 @@ impl Document {
     /// Compress PDF stream objects.
     pub fn compress(&mut self) {
         for object in self.objects.values_mut() {
-            if let Object::Stream(ref mut stream) = *object {
+            if let Object::Stream(stream) = object {
                 if stream.allows_compression {
                     // Ignore any error and continue to compress other streams.
                     let _ = stream.compress();
@@ -33,8 +33,8 @@ impl Document {
     /// Decompress PDF stream objects.
     pub fn decompress(&mut self) {
         for object in self.objects.values_mut() {
-            if let Object::Stream(ref mut stream) = *object {
-                stream.decompress()
+            if let Object::Stream(stream) = object {
+                let _ = stream.decompress();
             }
         }
     }
@@ -43,7 +43,7 @@ impl Document {
     pub fn delete_pages(&mut self, page_numbers: &[u32]) {
         let pages = self.get_pages();
         for page_number in page_numbers {
-            if let Some(page) = pages.get(&page_number).and_then(|page_id| self.delete_object(*page_id)) {
+            if let Some(page) = pages.get(page_number).and_then(|page_id| self.delete_object(*page_id)) {
                 let mut page_tree_ref = page
                     .as_dict()
                     .and_then(|dict| dict.get(b"Parent"))
@@ -81,8 +81,8 @@ impl Document {
 
     /// Delete object by object ID.
     pub fn delete_object(&mut self, id: ObjectId) -> Option<Object> {
-        let action = |object: &mut Object| match *object {
-            Object::Array(ref mut array) => {
+        let action = |object: &mut Object| match object {
+            Object::Array(array) => {
                 if let Some(index) = array.iter().position(|item: &Object| match *item {
                     Object::Reference(ref_id) => ref_id == id,
                     _ => false,
@@ -90,7 +90,7 @@ impl Document {
                     array.remove(index);
                 }
             }
-            Object::Dictionary(ref mut dict) => {
+            Object::Dictionary(dict) => {
                 let keys: Vec<Vec<u8>> = dict
                     .iter()
                     .filter(|&(_, item): &(&Vec<u8>, &Object)| match *item {
@@ -161,10 +161,64 @@ impl Document {
     }
 
     /// Renumber objects with a custom starting id, this is very useful in case of multiple
-    /// document objects insertion in a single main document
+    /// document object insertions in a single main document
     pub fn renumber_objects_with(&mut self, starting_id: u32) {
         let mut replace = BTreeMap::new();
         let mut new_id = starting_id;
+        let mut i = 0;
+
+        // Check if we need to order the pages first, as this means the first page doesn't have a lower ID.
+        // So it ends up in a random spot based on its ID. We check first to avoid double traversal, unless we have too.
+
+        let mut page_order: Vec<(i32, (u32, u16))> = self
+            .page_iter()
+            .map(|id| {
+                i += 1;
+                (i, id)
+            })
+            .collect();
+
+        page_order.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+        i = 0;
+
+        let needs_ordering = page_order.iter().any(|a| {
+            i += 1;
+            a.0 != i
+        });
+
+        if needs_ordering {
+            let mut pages = page_order.clone();
+            pages.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            let mut objects = BTreeMap::new();
+
+            for (old, new) in pages.iter().zip(page_order) {
+                if let Some(object) = self.objects.remove(&old.1) {
+                    objects.insert((new.1 .0, old.1 .1), object);
+                    replace.insert(old.1, (new.1 .0, old.1 .1));
+                }
+
+                if old.1 != new.1 {
+                    self.renumber_bookmarks(&old.1, &(new.1 .0, old.1 .1));
+                }
+            }
+
+            for (new, object) in objects {
+                self.objects.insert(new, object);
+            }
+
+            let action = |object: &mut Object| {
+                if let Object::Reference(id) = object {
+                    if replace.contains_key(id) {
+                        *id = replace[id];
+                    }
+                }
+            };
+
+            self.traverse_objects(action);
+            replace.clear();
+        }
+
         let mut ids = self.objects.keys().cloned().collect::<Vec<ObjectId>>();
         ids.sort_unstable();
 
@@ -195,8 +249,8 @@ impl Document {
         }
 
         let action = |object: &mut Object| {
-            if let Object::Reference(ref mut id) = *object {
-                if replace.contains_key(&id) {
+            if let Object::Reference(id) = object {
+                if replace.contains_key(id) {
                     *id = replace[id];
                 }
             }
@@ -208,30 +262,26 @@ impl Document {
     }
 
     pub fn change_content_stream(&mut self, stream_id: ObjectId, content: Vec<u8>) {
-        if let Some(content_stream) = self.objects.get_mut(&stream_id) {
-            if let Object::Stream(ref mut stream) = *content_stream {
-                stream.set_plain_content(content);
-                // Ignore any compression error.
-                let _ = stream.compress();
-            }
+        if let Some(Object::Stream(stream)) = self.objects.get_mut(&stream_id) {
+            stream.set_plain_content(content);
+            // Ignore any compression error.
+            let _ = stream.compress();
         }
     }
 
     pub fn change_page_content(&mut self, page_id: ObjectId, content: Vec<u8>) -> Result<()> {
         let contents = self.get_dictionary(page_id).and_then(|page| page.get(b"Contents"))?;
-        match *contents {
-            Object::Reference(id) => self.change_content_stream(id, content),
-            Object::Array(ref arr) => {
+        match contents {
+            Object::Reference(id) => self.change_content_stream(*id, content),
+            Object::Array(arr) => {
                 if arr.len() == 1 {
                     if let Ok(id) = arr[0].as_reference() {
                         self.change_content_stream(id, content)
                     }
                 } else {
                     let new_stream = self.add_object(super::Stream::new(dictionary! {}, content));
-                    if let Ok(page) = self.get_object_mut(page_id) {
-                        if let Object::Dictionary(ref mut dict) = *page {
-                            dict.set("Contents", new_stream);
-                        }
+                    if let Ok(Object::Dictionary(dict)) = self.get_object_mut(page_id) {
+                        dict.set("Contents", new_stream);
                     }
                 }
             }
@@ -241,18 +291,16 @@ impl Document {
     }
 
     pub fn extract_stream(&self, stream_id: ObjectId, decompress: bool) -> Result<()> {
-        let mut file = File::create(format!("{:?}.bin", stream_id))?;
-        if let Ok(stream_obj) = self.get_object(stream_id) {
-            if let Object::Stream(ref stream) = *stream_obj {
-                if decompress {
-                    if let Ok(data) = stream.decompressed_content() {
-                        file.write_all(&data)?;
-                    } else {
-                        file.write_all(&stream.content)?;
-                    }
+        let mut file = File::create(format!("{stream_id:?}.bin"))?;
+        if let Ok(Object::Stream(stream)) = self.get_object(stream_id) {
+            if decompress {
+                if let Ok(data) = stream.decompressed_content() {
+                    file.write_all(&data)?;
                 } else {
                     file.write_all(&stream.content)?;
                 }
+            } else {
+                file.write_all(&stream.content)?;
             }
         }
         Ok(())

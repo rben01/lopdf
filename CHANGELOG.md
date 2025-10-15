@@ -1,4 +1,684 @@
 
+<a name="v0.38.0"></a>
+## [v0.38.0](https://github.com/J-F-Liu/lopdf/compare/v0.37.0...v0.38.0) (2025-08-26)
+
+### Add
+
+* Add enhanced PDF decryption support for encrypted documents with empty passwords
+* Add automatic decryption during document loading for better pdftk compatibility
+* Add raw object extraction before parsing to handle encrypted content
+* Add support for decrypting PDFs with compressed object streams
+* Add comprehensive test suite for PDF decryption functionality
+* Add `assets/encrypted.pdf` test file for decryption testing
+* Add examples demonstrating decryption capabilities (`test_decryption.rs`, `verify_decryption.rs`)
+
+### Enhance
+
+* Enhance `Reader::read()` to detect and handle encrypted PDFs automatically
+* Enhance document loading to attempt empty password authentication by default
+* Enhance object processing to decrypt objects after parsing
+* Enhance support for encrypted PDFs containing object streams
+
+### Fix
+
+* Fix encrypted object parsing by extracting raw bytes before decryption
+* Fix object stream handling in encrypted documents
+* Fix decryption workflow to match pdftk's approach
+
+### Implementation Details
+
+* Modified `src/reader.rs` to add `load_encrypted_document()` method
+* Added `extract_raw_object()` method for raw byte extraction
+* Added `parse_raw_object()` method for parsing extracted bytes
+* Store raw object bytes in `Reader::raw_objects` field for deferred decryption
+* Process compressed objects from object streams after decryption
+
+<a name="v0.37.0"></a>
+## [v0.37.0](https://github.com/J-F-Liu/lopdf/compare/v0.36.0...v0.37.0) (2025-08-08)
+
+### Add
+
+* Add complete PDF object streams write support enabling 11-61% file size reduction ([#XXX](https://github.com/J-F-Liu/lopdf/issues/XXX))
+* Add `save_modern()` method for easy object streams and cross-reference streams usage  
+* Add `SaveOptions` struct with builder pattern for configuring compression settings
+* Add `ObjectStreamBuilder` for creating object streams programmatically
+* Add cross-reference stream support for PDF 1.5+ compliance
+* Add `replace_partial_text()` function for partial text replacement in PDFs
+* Add comprehensive test suite with 50+ tests for object streams functionality
+* Add object streams write capability (previously read-only)
+* Add implementation documentation in OBJECT_STREAMS_IMPLEMENTATION.md
+
+### Fix
+
+* Fix pdfutil build error - missing `derive` feature for clap dependency
+* Fix async feature compilation - 25 examples/tests failing with `--all-features`
+* Fix 31 clippy linting errors blocking CI with `#![deny(clippy::all)]`
+* Fix object compression eligibility - structural objects (Catalog, Pages, Page) now properly compressed
+* Fix trailer-referenced objects compression - only encryption dictionary excluded from compression
+* Fix linearization detection for proper Catalog handling per PDF specification
+* Fix compilation warnings
+
+### Update
+
+* Update to Rust 2024 edition with minimum Rust 1.85 requirement
+
+### Maintain
+
+* Maintain full backward compatibility - all existing APIs unchanged
+
+
+<a name="v0.36.0"></a>
+## [v0.36.0](https://github.com/J-F-Liu/lopdf/compare/0.35.0...v0.36.0) (2025-03-15)
+
+### Add
+
+* Add support for Revision 5 ([#401](https://github.com/J-F-Liu/lopdf/issues/401))
+* Add more checks to the encryption/decryption logic ([#399](https://github.com/J-F-Liu/lopdf/issues/399))
+* Add sanity checks for PDF encryption, add examples for decrypting/encrypting PDF files and various bug fixes ([#397](https://github.com/J-F-Liu/lopdf/issues/397))
+* Add encrypt function to crypt filters
+* Add support for jiff and make both chrono and time optional features
+
+### Avoid
+
+* Avoid parsing encrypted object streams early and correctly parse object streams upon decryption ([#385](https://github.com/J-F-Liu/lopdf/issues/385))
+* Avoid decrypting cross-reference streams ([#381](https://github.com/J-F-Liu/lopdf/issues/381))
+
+### Check
+
+* Check if the security handler is the standard one
+
+### Clarify
+
+* Clarify datetime parsing logic using the PDF specification
+
+### Compute
+
+* Compute the file encryption key (revision 6)
+
+### Declare
+
+* Declare and implement crypt filters
+
+### Ensure
+
+* Ensure the document is actually encrypted
+
+### Fix
+
+* Fix unused imports
+* Fix warning for rotate example
+* Fix warnings about nom_parser
+* Fix clippy warning about operator precedence
+* Fix typo in comment
+
+### Gracefully
+
+* Gracefully handle the is_aes check without throwing errors ([#376](https://github.com/J-F-Liu/lopdf/issues/376))
+
+### Handle
+
+* Handle cases where the stream objects override the crypt filter
+
+### Implement
+
+* Implement Document::encrypt() ([#396](https://github.com/J-F-Liu/lopdf/issues/396))
+* Implement password authentication (revision 6)
+* Implement decrypt with and without password sanitization
+* Implement authentication functions
+* Implement password sanitization from string
+* Implement password algorithms 2-7
+* Implement encrypt_object function
+* Implement and use PKCS[#5](https://github.com/J-F-Liu/lopdf/issues/5) padding instead
+* Implement function to parse the available crypt filters
+* Implement 256-bit AES-CBC crypt filter
+* Implement TryFrom rather than TryInto
+
+### Improve
+
+* Improve the AES decryption with some sanity checks ([#383](https://github.com/J-F-Liu/lopdf/issues/383))
+
+### Merge
+
+* Merge remaining algorithms functions into PasswordAlgorithm implementation
+
+### Missing
+
+* Missing import to test
+
+### Only
+
+* Only encode EncryptMetadata when V >= 4 ([#400](https://github.com/J-F-Liu/lopdf/issues/400))
+
+### Provide
+
+* Provide revision-agnostic functions for the password algorithms
+
+### Randomly
+
+* Randomly generate file encryption key for V5 in encrypt example ([#403](https://github.com/J-F-Liu/lopdf/issues/403))
+
+### Recurse
+
+* Recurse into arrays and dictionaries to fully decrypt all strings/streams ([#378](https://github.com/J-F-Liu/lopdf/issues/378))
+
+### Release
+
+* Release 0.36
+
+### Remove
+
+* Remove the old implementation
+* Remove workflow that used to enable the nom_parser feature
+* Remove nom_parser feature
+
+### Reorganize
+
+* Reorganize encryption code
+
+### Sanitize
+
+* Sanitize passwords (revision 6)
+
+### Try
+
+* Try decrypting with an empty password
+
+### Unpack
+
+* Unpack objects after decrypting object streams ([#382](https://github.com/J-F-Liu/lopdf/issues/382))
+
+### Update
+
+* Update to nom 8.0 and nom_locate 5.0 ([#402](https://github.com/J-F-Liu/lopdf/issues/402))
+
+### Update
+
+* update changelog
+
+### Use
+
+* Use a hasher instead of allocating a Vec
+* Use the new implementation to compute the file encryption key
+* Use the default stream and string crypt filter if present
+* Use Unix epoch if time feature is not enabled
+* Use get_deref for the Kids array to handle indirect references ([#379](https://github.com/J-F-Liu/lopdf/issues/379))
+
+### Validate
+
+* Validate encryption dictionary for revision 5 ([#405](https://github.com/J-F-Liu/lopdf/issues/405))
+
+### Validate
+
+* validate binary comment during parsing ([#392](https://github.com/J-F-Liu/lopdf/issues/392))
+
+
+<a name="0.35.0"></a>
+## [0.35.0](https://github.com/J-F-Liu/lopdf/compare/v0.34.0...0.35.0) (2025-01-19)
+
+### Add
+
+* Add test for supported color types in PDF image embedding
+* Add function for text chunks extraction. ([#342](https://github.com/J-F-Liu/lopdf/issues/342))
+
+### Added
+
+* added binary comment as attribute and for load and write. Binary Comment is gonna be important for pdf in A/2, A/3 format. ([#370](https://github.com/J-F-Liu/lopdf/issues/370))
+
+### Allow
+
+* Allow parsing off-spec PDF files with prefixes before the header ([#362](https://github.com/J-F-Liu/lopdf/issues/362))
+
+### Also
+
+* Also accept ASCII85 streams without EOD marker ([#354](https://github.com/J-F-Liu/lopdf/issues/354))
+
+### Fix
+
+* Fix clippy warning
+* Fix incorrect image data handling in PDF content stream
+* Fix BitsPerComponent calculation and improper ColorSpace mapping
+* Fix incorrect color type detection for JPEG images
+* Fix mulitplication overflow in ascii85 decode ([#348](https://github.com/J-F-Liu/lopdf/issues/348))
+* Fix out of memory bug ([#347](https://github.com/J-F-Liu/lopdf/issues/347))
+* Fix addition overflow ([#346](https://github.com/J-F-Liu/lopdf/issues/346))
+* Fix lowercase s of Procset and no space target string(J-F-Liu[#323](https://github.com/J-F-Liu/lopdf/issues/323)) ([#324](https://github.com/J-F-Liu/lopdf/issues/324))
+
+### Ignore
+
+* Ignore space after byte index of startxref ([#371](https://github.com/J-F-Liu/lopdf/issues/371))
+
+### Implement
+
+* Implement ToUnicode for variadic len encodings ([#328](https://github.com/J-F-Liu/lopdf/issues/328))
+
+### Improve
+
+* Improve JPEG processing efficiency by avoiding unnecessary decode ([#345](https://github.com/J-F-Liu/lopdf/issues/345))
+* Improve cmap parsing and internal error handling ([#335](https://github.com/J-F-Liu/lopdf/issues/335))
+
+### Inline
+
+* Inline images ([#356](https://github.com/J-F-Liu/lopdf/issues/356))
+
+### Keep
+
+* keep existing values when extending dictionary ([#322](https://github.com/J-F-Liu/lopdf/issues/322))
+
+### Properly
+
+* Properly support document prefixes ([#365](https://github.com/J-F-Liu/lopdf/issues/365))
+
+### Refactor
+
+* Refactor and optimize image processing logic in xobject.rs
+
+### Release
+
+* Release 0.35
+
+### Remove
+
+* remove misleading Object::as_string ([#350](https://github.com/J-F-Liu/lopdf/issues/350))
+
+### Remove
+
+* Remove superfluous `ref` keyword ([#361](https://github.com/J-F-Liu/lopdf/issues/361))
+* Remove pom parser ([#355](https://github.com/J-F-Liu/lopdf/issues/355))
+* Remove /Prev from trailer ([#333](https://github.com/J-F-Liu/lopdf/issues/333))
+
+### Replace
+
+* Replace debug assert with Result ([#349](https://github.com/J-F-Liu/lopdf/issues/349))
+* Replace unwrap with error handling ([#351](https://github.com/J-F-Liu/lopdf/issues/351))
+
+### Rework
+
+* Rework errors ([#358](https://github.com/J-F-Liu/lopdf/issues/358))
+
+### Specify
+
+* Specify minimum Rust version in Cargo.toml ([#320](https://github.com/J-F-Liu/lopdf/issues/320))
+
+### Support
+
+* Support UTF-16 encoding for bookmark titles with non-ASCII characters ([#364](https://github.com/J-F-Liu/lopdf/issues/364))
+* Support AES encryption and revision 4 ([#343](https://github.com/J-F-Liu/lopdf/issues/343))
+
+### Throw
+
+* Throw error if xref stream cannot be uncompressed ([#339](https://github.com/J-F-Liu/lopdf/issues/339))
+
+### Update
+
+* update changelog
+
+
+<a name="v0.34.0"></a>
+## [v0.34.0](https://github.com/J-F-Liu/lopdf/compare/v0.33.0...v0.34.0) (2024-08-31)
+
+### Add
+
+* Add ASCII85 decoding ([#317](https://github.com/J-F-Liu/lopdf/issues/317))
+* Add text extraction based on ToUnicode cmap  ([#314](https://github.com/J-F-Liu/lopdf/issues/314))
+* Add error handling to object stream ([#299](https://github.com/J-F-Liu/lopdf/issues/299))
+* Add PDFDocEncoding ([#296](https://github.com/J-F-Liu/lopdf/issues/296))
+
+### Cleanup
+
+* Cleanup comments and cargo fmt ([#290](https://github.com/J-F-Liu/lopdf/issues/290))
+
+### Detect
+
+* Detect reference cycles when going through trailers ([#308](https://github.com/J-F-Liu/lopdf/issues/308))
+* Detect reference cycles when parsing streams (with nom_parser) ([#300](https://github.com/J-F-Liu/lopdf/issues/300))
+* Detect reference cycles when collecting page resources ([#298](https://github.com/J-F-Liu/lopdf/issues/298))
+
+### Fix
+
+* Fix unicode fonts extraction in extract text example. ([#315](https://github.com/J-F-Liu/lopdf/issues/315))
+* Fix clippy warings
+
+### Implement
+
+* Implement encoding and decoding of text strings (PDF1.7 section 7.9.2.2) ([#297](https://github.com/J-F-Liu/lopdf/issues/297))
+
+### Improve
+
+* Improve error handling ([#307](https://github.com/J-F-Liu/lopdf/issues/307))
+
+### Refactor
+
+* Refactor get_or_create_resources() ([#291](https://github.com/J-F-Liu/lopdf/issues/291))
+
+### Release
+
+* Release 0.34
+
+### Replace
+
+* Replace unwrap with returning error ([#310](https://github.com/J-F-Liu/lopdf/issues/310))
+* Replace LinkedHashMap with IndexMap ([#293](https://github.com/J-F-Liu/lopdf/issues/293))
+
+### Update
+
+* Update dependencies ([#309](https://github.com/J-F-Liu/lopdf/issues/309))
+* Update readme of pdfutil ([#295](https://github.com/J-F-Liu/lopdf/issues/295))
+
+
+<a name="v0.33.0"></a>
+## [v0.33.0](https://github.com/J-F-Liu/lopdf/compare/v0.32.0...v0.33.0) (2024-08-31)
+
+### Accept
+
+* Accept comments in content parsing ([#261](https://github.com/J-F-Liu/lopdf/issues/261))
+
+### Added
+
+* Added a new feature to get images info from the pdf page. ([#275](https://github.com/J-F-Liu/lopdf/issues/275))
+
+### Async
+
+* Async Examples ([#266](https://github.com/J-F-Liu/lopdf/issues/266))
+
+### AsyncReader
+
+* AsyncReader ([#265](https://github.com/J-F-Liu/lopdf/issues/265))
+
+### Fix
+
+* Fix parse outline failed, the key ’D‘ might be an object id ([#274](https://github.com/J-F-Liu/lopdf/issues/274))
+* Fix parse outline failed([#270](https://github.com/J-F-Liu/lopdf/issues/270)) ([#271](https://github.com/J-F-Liu/lopdf/issues/271))
+
+### Indexmap
+
+* indexmap use in TOC for sorted TOC ([#267](https://github.com/J-F-Liu/lopdf/issues/267))
+
+### Release
+
+* Release 0.33
+
+### Replace
+
+* Replace md5 with md-5 ([#272](https://github.com/J-F-Liu/lopdf/issues/272))
+
+
+<a name="v0.32.0"></a>
+## [v0.32.0](https://github.com/J-F-Liu/lopdf/compare/v0.31.0...v0.32.0) (2024-08-31)
+
+### Add
+
+* Add debug format for hexadecimal ([#240](https://github.com/J-F-Liu/lopdf/issues/240))
+
+### Added
+
+* Added big generation value parsing ([#257](https://github.com/J-F-Liu/lopdf/issues/257))
+
+### Added
+
+* added object parse to get_page_fonts ([#249](https://github.com/J-F-Liu/lopdf/issues/249))
+* added meta info decryption ([#237](https://github.com/J-F-Liu/lopdf/issues/237))
+
+### Fix
+
+* Fix clippy warning and format code
+* Fix clippy warnings
+* Fix typo in README.md ([#251](https://github.com/J-F-Liu/lopdf/issues/251))
+
+### Fixed
+
+* Fixed parsing of the PDFs with incorrect xrefs to indirect objects ([#254](https://github.com/J-F-Liu/lopdf/issues/254))
+
+### Fixed
+
+* fixed clippy issues ([#238](https://github.com/J-F-Liu/lopdf/issues/238))
+
+### Handle
+
+* Handle references to arrays in get_page_contents() ([#245](https://github.com/J-F-Liu/lopdf/issues/245))
+
+### Object
+
+* Object and related types implement PartialEq ([#236](https://github.com/J-F-Liu/lopdf/issues/236))
+
+### Release
+
+* Release 0.32
+
+
+<a name="v0.31.0"></a>
+## [v0.31.0](https://github.com/J-F-Liu/lopdf/compare/v0.30.0...v0.31.0) (2023-05-10)
+
+### Add
+
+* Add example of page rotation ([#230](https://github.com/J-F-Liu/lopdf/issues/230))
+* Add decryption of documents using RC4 encryption. ([#228](https://github.com/J-F-Liu/lopdf/issues/228))
+
+### Annotate
+
+* Annotate feature usage ([#229](https://github.com/J-F-Liu/lopdf/issues/229))
+
+### Fix
+
+* Fix typo in README.md ([#233](https://github.com/J-F-Liu/lopdf/issues/233))
+
+### PDF
+
+* PDF 2.0 is now a free specification
+
+### Release
+
+* Release 0.31
+
+### Remove
+
+* Remove extraneous `Q` operation from insert_image ([#227](https://github.com/J-F-Liu/lopdf/issues/227))
+
+
+<a name="v0.30.0"></a>
+## [v0.30.0](https://github.com/J-F-Liu/lopdf/compare/v0.29.0...v0.30.0) (2023-04-09)
+
+### Add
+
+* Add support for extracting TOC, Outlines and NamedDestinations ([#211](https://github.com/J-F-Liu/lopdf/issues/211))
+* Add example extract_text ([#212](https://github.com/J-F-Liu/lopdf/issues/212))
+* Add get_encrypted and is_encrypted ([#210](https://github.com/J-F-Liu/lopdf/issues/210))
+* Add load_filtered method ([#198](https://github.com/J-F-Liu/lopdf/issues/198))
+* Add as_string method to Object ([#196](https://github.com/J-F-Liu/lopdf/issues/196))
+
+### Adding
+
+* Adding Comments to examples ([#220](https://github.com/J-F-Liu/lopdf/issues/220))
+
+### Fix
+
+* Fix clippy warning
+* Fix cliippy warnings
+* Fix datetime using time crate
+* Fix Cargo.toml ([#213](https://github.com/J-F-Liu/lopdf/issues/213))
+* Fix ci build issue ([#209](https://github.com/J-F-Liu/lopdf/issues/209))
+* Fix extract_text to split text at word boundaries.
+* Fix embed_image feature
+
+### Make
+
+* Make some more objects public. ([#199](https://github.com/J-F-Liu/lopdf/issues/199))
+
+### Readd
+
+* Readd accidently deleted pdf files in assets ([#204](https://github.com/J-F-Liu/lopdf/issues/204))
+
+### Release
+
+* Release 0.30
+
+### Remove
+
+* Remove obsolete lifetime
+
+### Replace
+
+* Replace unmaitained encoding crate with encoding_rs ([#222](https://github.com/J-F-Liu/lopdf/issues/222))
+
+### Set
+
+* Set default to nom_parser and rayon ([#208](https://github.com/J-F-Liu/lopdf/issues/208))
+
+### Update
+
+* Update time dependency ([#206](https://github.com/J-F-Liu/lopdf/issues/206))
+* Update nom dependency
+* Update time dependency
+* Update edition and some dependencies.
+
+
+<a name="v0.29.0"></a>
+## [v0.29.0](https://github.com/J-F-Liu/lopdf/compare/v0.27.0...v0.29.0) (2023-04-09)
+
+### Add
+
+* Add function get_page_annotations and include an example ([#184](https://github.com/J-F-Liu/lopdf/issues/184))
+
+### Added
+
+* Added documentation and improved tests ([#178](https://github.com/J-F-Liu/lopdf/issues/178))
+
+### Allow
+
+* Allow mutable access to the document catalog ([#189](https://github.com/J-F-Liu/lopdf/issues/189))
+
+### Extend
+
+* Extend match layout change and Full bookmark example in merge. ([#179](https://github.com/J-F-Liu/lopdf/issues/179))
+
+### Fix
+
+* Fix nom parser
+* Fix clippy warnings
+* Fix add_barcode example
+* Fix Incremental.pdf
+* Fix documentation issues and make README testable ([#171](https://github.com/J-F-Liu/lopdf/issues/171))
+* Fix pdfutil build error
+* Fix `extend` definition confusion bug ([#161](https://github.com/J-F-Liu/lopdf/issues/161))
+
+### Fixed
+
+* Fixed [#175](https://github.com/J-F-Liu/lopdf/issues/175) and some clippy issues.  ([#182](https://github.com/J-F-Liu/lopdf/issues/182))
+
+### Guard
+
+* Guard example based on if the "parser" feature is enabled ([#173](https://github.com/J-F-Liu/lopdf/issues/173))
+
+### Made
+
+* made XREF parser accept an optional space character after 'xref' ([#167](https://github.com/J-F-Liu/lopdf/issues/167))
+
+### Make
+
+* Make add_xobject follow references ([#187](https://github.com/J-F-Liu/lopdf/issues/187))
+* Make xref public ,fix line endings and Fix Xref output so Adobe will open them again. ([#181](https://github.com/J-F-Liu/lopdf/issues/181))
+
+### Merge
+
+* Merge branch 'master' of https://github.com/J-F-Liu/lopdf
+
+### Release
+
+* Release 0.29
+* Release 0.28
+
+### Remove
+
+* Remove --no-default-features test
+
+### Remove
+
+* remove unneccessary time 0.1 dependency ([#163](https://github.com/J-F-Liu/lopdf/issues/163))
+
+### Reorder
+
+* Reorder Pages before Renumbering Objects. ([#193](https://github.com/J-F-Liu/lopdf/issues/193))
+
+### Support
+
+* Support Incremental Updates ([#176](https://github.com/J-F-Liu/lopdf/issues/176))
+
+### Switch
+
+* switch to single-precision floating point ([#190](https://github.com/J-F-Liu/lopdf/issues/190))
+
+### Update
+
+* Update itoa dependency to 1.0 ([#162](https://github.com/J-F-Liu/lopdf/issues/162))
+
+
+<a name="v0.27.0"></a>
+## [v0.27.0](https://github.com/J-F-Liu/lopdf/compare/v0.26.0...v0.27.0) (2021-12-16)
+
+### Add
+
+* Add GitHub Actions build matrix ([#127](https://github.com/J-F-Liu/lopdf/issues/127))
+* Add Change Log
+
+### Added
+
+* Added Object::as_float() to convert numerical values to float. ([#124](https://github.com/J-F-Liu/lopdf/issues/124))
+* Added Object::as_bool ([#123](https://github.com/J-F-Liu/lopdf/issues/123))
+
+### Avoid
+
+* Avoid panic when encounters negative stream length
+
+### Bookmarks
+
+* Bookmarks ([#135](https://github.com/J-F-Liu/lopdf/issues/135))
+
+### Change
+
+* Change indent_style to space
+
+### Check
+
+* Check stream length
+
+### Do
+
+* Do not limit Real precision to two digits ([#155](https://github.com/J-F-Liu/lopdf/issues/155))
+
+### Fix
+
+* Fix document save race in parser_aux::load_and_save and creator::create_document ([#151](https://github.com/J-F-Liu/lopdf/issues/151))
+* Fix clippy warnings & add clippy build job ([#128](https://github.com/J-F-Liu/lopdf/issues/128))
+
+### Preserve
+
+* Preserve the eol characters in literal strings ([#131](https://github.com/J-F-Liu/lopdf/issues/131))
+
+### Reduce
+
+* Reduce allocation by reusing the iterator ([#129](https://github.com/J-F-Liu/lopdf/issues/129))
+
+### Release
+
+* Release 0.27
+* Release pdfutil 0.4
+
+### Replace
+
+* Replace lzw with weezl ([#140](https://github.com/J-F-Liu/lopdf/issues/140))
+
+### Return
+
+* Return early on error in `Stream::filters` ([#130](https://github.com/J-F-Liu/lopdf/issues/130))
+
+### Unwrap
+
+* Unwrap the text ([#119](https://github.com/J-F-Liu/lopdf/issues/119))
+
+### Update
+
+* Update nom to 6.0 ([#126](https://github.com/J-F-Liu/lopdf/issues/126))
+
+
 <a name="v0.26.0"></a>
 ## [v0.26.0](https://github.com/J-F-Liu/lopdf/compare/v0.25.0...v0.26.0) (2020-09-29)
 
@@ -65,11 +745,11 @@
 
 ### Limit
 
-* limit recursion to the number of objects ([#92](https://github.com/J-F-Liu/lopdf/issues/92))
+* Limit allowed bracket depth. ([#97](https://github.com/J-F-Liu/lopdf/issues/97))
 
 ### Limit
 
-* Limit allowed bracket depth. ([#97](https://github.com/J-F-Liu/lopdf/issues/97))
+* limit recursion to the number of objects ([#92](https://github.com/J-F-Liu/lopdf/issues/92))
 
 ### Move
 
